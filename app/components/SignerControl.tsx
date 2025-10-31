@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useAccount, useWriteContract } from "wagmi";
+import { injected } from 'wagmi/connectors'
 import { switchChain, createConfig, http } from '@wagmi/core'
 import { mainnet, sepolia } from '@wagmi/core/chains'
 import { ConnectButton } from "@rainbow-me/rainbowkit";
@@ -18,8 +19,9 @@ const SignerControl: React.FC<SignerControlProps> = ({ nodes, onSign }) => {
 
   const config = createConfig({
     chains: [mainnet],
+    connectors: [injected()], 
     transports: {
-        [mainnet.id]: http('https://eth-mainnet.g.alchemy.com/v2/hr7r2ANATPNHZti1Ip82GDfrrwPiR6Pl'),
+        [mainnet.id]: http(),
     },
     })
 

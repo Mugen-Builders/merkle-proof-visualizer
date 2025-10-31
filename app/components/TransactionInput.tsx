@@ -7,7 +7,7 @@ const TransactionInput = ({ onDecode }: { onDecode: (decoded: any) => void }) =>
 
   const client = createPublicClient({
     chain: mainnet,
-    transport: http("https://eth-mainnet.g.alchemy.com/v2/hr7r2ANATPNHZti1Ip82GDfrrwPiR6Pl"),
+    transport: http(),
   });
 
   const contractABI = [
