@@ -1,103 +1,244 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { createPublicClient, http, keccak256 } from 'viem';
+import { mainnet } from 'viem/chains';
+import TransactionInput from "./components/TransactionInput";
+import TreeHeightControl from "./components/TreeHeightControl";
+import ZoomControl from "./components/ZoomControl";
+import Diagram from "./components/Diagram";
+import SignerControl from "./components/SignerControl";
+
+/**
+ * Merkle Proof Diagram – interactive React page
+ *
+ * - Visualizes a Merkle inclusion proof similar to the provided sketch
+ * - Controls for tree height and left/right orientation of each proof step
+ * - Clean Tailwind UI, SVG rendering
+ */
+
+// ---- Helpers ---------------------------------------------------------------
+const clamp = (n: number, min: number, max: number): number => Math.min(max, Math.max(min, n));
+
+function makeDefaultPattern(h: number): boolean[] {
+  // Alternate: top sibling on the left, then right, etc.
+  return Array.from({ length: h }, (_, i) => i % 2 === 0);
+}
+
+// Generate layout for the diagram
+function useLayout({ height, pattern, proof, finalState }: { height: number; pattern: boolean[]; proof: string[]; finalState: string }): {
+  nodes: { id: string; label: string; x: number; y: number }[];
+  links: { from: string; to: string }[];
+  dims: {
+    minX: number;
+    minY: number;
+    width: number;
+    height: number;
+    NODE_W: number;
+    NODE_H: number;
+    RADIUS: number;
+  };
+} {
+  // layout constants
+  const X_STEP = 90; // horizontal distance between levels along the main path
+  const Y_STEP = 120; // vertical distance between levels
+  const X_SIBLING = 180; // lateral offset for sibling nodes
+  const NODE_W = 116;
+  const NODE_H = 54;
+  const RADIUS = 12;
+
+  const nodes = []; // { id, label, x, y }
+  const links = []; // { from, to }
+
+  // path nodes from root (level 0) down to final (level H)
+  for (let level = 0; level <= height; level++) {
+    const id = `path-${level}`;
+    const label = level === 0 ? "root" : level === height ? finalState : ""; // Set final node label to finalState only
+    nodes.push({ id, label, x: level * X_STEP, y: level * Y_STEP });
+
+    if (level > 0) {
+      // connect parent -> current along the right spine
+      links.push({ from: `path-${level - 1}`, to: id });
+    }
+  }
+
+  // add sibling proof nodes per level (1..H)
+  // proof indices: proof[H-1] near the top, ... proof[0] at the bottom
+  for (let level = 1; level <= height; level++) {
+    const proofIndex = height - level;
+    const siblingIsLeft = !!pattern[level - 1];
+    const parentId = `path-${level - 1}`;
+    const pathId = `path-${level}`;
+
+    const sx = level * X_STEP + (siblingIsLeft ? -X_SIBLING : X_SIBLING);
+    const sy = level * Y_STEP;
+
+    const sid = `sib-${level}`;
+    const label = proof[proofIndex] || `proof[${proofIndex}]`; // Use actual proof value if available
+
+    nodes.push({ id: sid, label, x: sx, y: sy });
+
+    // connect parent -> children (sibling and path node)
+    links.push({ from: parentId, to: sid });
+    links.push({ from: parentId, to: pathId });
+  }
+
+  // compute overall bounds for the SVG viewBox
+  const xs = nodes.map((n) => n.x);
+  const ys = nodes.map((n) => n.y);
+  const minX = Math.min(...xs) - (NODE_W + 40);
+  const maxX = Math.max(...xs) + (NODE_W + 40);
+  const minY = Math.min(...ys) - (NODE_H + 40);
+  const maxY = Math.max(...ys) + (NODE_H + 40);
+
+  return {
+    nodes,
+    links,
+    dims: {
+      minX,
+      minY,
+      width: maxX - minX,
+      height: maxY - minY,
+      NODE_W,
+      NODE_H,
+      RADIUS,
+    },
+  };
+}
+
+// ---- Page -----------------------------------------------------------------
+export default function MerkleProofPage() {
+  const [height, setHeight] = useState(6); // number of proof elements
+  const [pattern, setPattern] = useState(Array.from({ length: 6 }, () => true));
+  const [zoom, setZoom] = useState(1); // Zoom level
+  const [decodedData, setDecodedData] = useState<any>(null); // Decoded transaction data
+  const [nodes, setNodes] = useState<{ id: string; label: string; x: number; y: number }[]>([]); // Add state for nodes
+
+  // keep pattern length in sync with height
+  const normalizedPattern = useMemo(() => {
+    let p = pattern.slice(0, height);
+    if (p.length < height) {
+      p = p.concat(makeDefaultPattern(height).slice(p.length));
+    }
+    return p;
+  }, [pattern, height]);
+
+  const { nodes: layoutNodes, links, dims } = useLayout({
+    height,
+    pattern: normalizedPattern,
+    proof: decodedData?.proof || [],
+    finalState: decodedData?.finalState || "",
+  });
+
+  useEffect(() => {
+    // // console.log("nodes state:", nodes);// nodes contains the current values of the nodes
+
+    // if (
+    //   nodes.length !== layoutNodes.length ||
+    //   nodes.some((node, index) =>
+    //     node.x !== layoutNodes[index].x ||
+    //     node.y !== layoutNodes[index].y ||
+    //     node.id !== layoutNodes[index].id ||
+    //     node.label !== layoutNodes[index].label 
+    //   )
+    // ) {
+    //   // setNodes(layoutNodes); // Only update nodes if layoutNodes structure has changed
+    //   // console.log("Updated proof state:", layoutNodes.map(node => ({ id: node.id, label: node.label, x: node.x, y: node.y }))); // Log the current state of each node
+    // }
+  }, [layoutNodes]);
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen w-full bg-gradient-to-b from-gray-50 to-white text-gray-900">
+      <div className="mx-auto max-w-6xl px-6 py-10">
+        <header className="mb-6 flex items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Merkle Proof Visualizer</h1>
+            <p className="text-sm text-gray-600">
+              A simple, interactive diagram that shows how a Merkle inclusion proof climbs from a leaf
+              (<span className="font-medium">final</span>) to the <span className="font-medium">root</span> using the proof elements.
+            </p>
+          </div>
+        </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+        {/* Transaction Hash Input */}
+        <TransactionInput
+          onDecode={(decoded) => {
+            setDecodedData(decoded);
+            console.log("Decoded transaction data:", decoded);
+
+            if (decoded && decoded.proof) {
+              const proof = decoded.proof;
+              if (Array.isArray(proof) && proof.length > 0) {
+                setPattern(proof.map(() => true)); // Use the proof length to set the pattern
+                setHeight(proof.length); // Set the height based on the proof length
+
+                // Generate the layout using useLayout with all siblings on the left
+                const { nodes: layoutNodes, links, dims } = useLayout({
+                  height: proof.length,
+                  pattern: Array.from({ length: proof.length }, () => true), // Ensure all siblings are on the left
+                  proof,
+                  finalState: decoded.finalState,
+                });
+
+                // Calculate values for right nodes (path-x nodes except the last one)
+                let node = Buffer.from(decoded.finalState.slice(2), "hex");
+                const updatedNodes = [...layoutNodes];
+
+                for (let i = 0; i < proof.length - 1; i++) {
+                  const sibling = Buffer.from(proof[i].slice(2), "hex");
+                  node = Buffer.from(keccak256(Buffer.concat([sibling, node])).slice(2), "hex");
+
+                  // Find the corresponding path-x node and update its label
+                  const pathNodeId = `path-${proof.length - 1 - i}`;
+                  const pathNode = updatedNodes.find((n) => n.id === pathNodeId);
+
+                  if (pathNode) {
+                    pathNode.label = "0x" + node.toString("hex");
+                  }
+                }
+
+                setNodes(updatedNodes); // Update the nodes state with calculated values
+              } else {
+                console.error("Proof data is not a valid array or is empty.");
+              }
+            } else {
+              console.error("Decoded arguments are invalid or missing.");
+            }
+          }}
+        />
+
+        {/* Controls */}
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <TreeHeightControl height={height} setHeight={(newHeight) => {
+            setHeight(newHeight);
+            setPattern(Array.from({ length: newHeight }, () => true));
+          }} />
+
+  
+          <ZoomControl zoom={zoom} setZoom={setZoom} />
+
+          <SignerControl
+            nodes={nodes}
+            onSign={(contractAddress) => {
+              console.log("Signing transaction for contract:", contractAddress);
+              // Add signing logic here
+            }}
+          />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        <Diagram
+          nodes={nodes}
+          setNodes={setNodes}
+          links={links}
+          dims={dims}
+          zoom={zoom}
+          setZoom={setZoom}
+          height={height}
+        />
+  
+        <footer className="mt-6 text-center text-xs text-gray-500">
+          Tip: proof elements are ordered bottom-up: proof[0] pairs with the leaf (final), proof[H-1] is near the root.
+        </footer>
+      </div>
     </div>
   );
 }
