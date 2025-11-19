@@ -131,21 +131,14 @@ export default function MerkleProofPage() {
   });
 
   useEffect(() => {
-    // // console.log("nodes state:", nodes);// nodes contains the current values of the nodes
-
-    // if (
-    //   nodes.length !== layoutNodes.length ||
-    //   nodes.some((node, index) =>
-    //     node.x !== layoutNodes[index].x ||
-    //     node.y !== layoutNodes[index].y ||
-    //     node.id !== layoutNodes[index].id ||
-    //     node.label !== layoutNodes[index].label 
-    //   )
-    // ) {
-    //   // setNodes(layoutNodes); // Only update nodes if layoutNodes structure has changed
-    //   // console.log("Updated proof state:", layoutNodes.map(node => ({ id: node.id, label: node.label, x: node.x, y: node.y }))); // Log the current state of each node
-    // }
-  }, [layoutNodes]);
+    const newLayout = useLayout({
+      height,
+      pattern: normalizedPattern,
+      proof: decodedData?.proof || [],
+      finalState: decodedData?.finalState || "",
+    });
+    setNodes(newLayout.nodes);
+  }, [height, normalizedPattern, decodedData]);
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-gray-50 to-white text-gray-900">
@@ -162,6 +155,27 @@ export default function MerkleProofPage() {
 
         {/* Transaction Hash Input */}
         <TransactionInput
+          onZero={() => {
+            const newHeight = 48;
+            const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
+            const newProof = Array.from({ length: newHeight }, () => zeroHash);
+            const newFinalState = zeroHash;
+
+            setHeight(newHeight);
+            setPattern(Array.from({ length: newHeight }, () => true));
+            setDecodedData({
+              proof: newProof,
+              finalState: newFinalState,
+            });
+
+            const { nodes: layoutNodes } = useLayout({
+              height: newHeight,
+              pattern: Array.from({ length: newHeight }, () => true),
+              proof: newProof,
+              finalState: newFinalState,
+            });
+            setNodes(layoutNodes);
+          }}
           onDecode={(decoded) => {
             setDecodedData(decoded);
             console.log("Decoded transaction data:", decoded);

@@ -12,18 +12,18 @@ interface SignerControlProps {
 
 const SignerControl: React.FC<SignerControlProps> = ({ nodes, onSign }) => {
   const [contractAddress, setContractAddress] = useState("");
-  const [network, setNetwork] = useState("ethereum");
   const { isConnected } = useAccount();
 
   const { writeContract } = useWriteContract();
 
-  const config = createConfig({
-    chains: [mainnet],
-    connectors: [injected()], 
-    transports: {
-        [mainnet.id]: http(),
-    },
-    })
+  // const chain = sepolia
+  // const config = createConfig({
+  //   chains: [chain],
+  //   connectors: [injected()], 
+  //   transports: {
+  //       [chain.id]: http(),
+  //   },
+  // });
 
   const handleSign = async () => {
     if (!contractAddress) {
@@ -65,6 +65,7 @@ const SignerControl: React.FC<SignerControlProps> = ({ nodes, onSign }) => {
           address: contractAddress as `0x${string}`,
           functionName: 'joinTournament',
           args: [finalState, proof, left, right],
+          value: BigInt("232198050000000000"),
        });
 
     } catch (error) {

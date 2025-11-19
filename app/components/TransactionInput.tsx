@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { createPublicClient, http, decodeFunctionData } from "viem";
-import { mainnet } from "viem/chains";
+import { mainnet, sepolia } from "viem/chains";
 
-const TransactionInput = ({ onDecode }: { onDecode: (decoded: any) => void }) => {
+const TransactionInput = ({ onDecode, onZero }: { onDecode: (decoded: any) => void; onZero: () => void; }) => {
   const [transactionHash, setTransactionHash] = useState("");
 
   const client = createPublicClient({
-    chain: mainnet,
+    chain: sepolia,
     transport: http(),
   });
 
@@ -74,6 +74,12 @@ const TransactionInput = ({ onDecode }: { onDecode: (decoded: any) => void }) =>
           className="rounded-lg bg-blue-500 px-4 py-2 text-sm text-white shadow-sm hover:bg-blue-600"
         >
           Decode
+        </button>
+        <button
+          onClick={onZero}
+          className="rounded-lg bg-gray-500 px-4 py-2 text-sm text-white shadow-sm hover:bg-gray-600"
+        >
+          Blank Input
         </button>
       </div>
     </div>
