@@ -20,7 +20,7 @@ const TransactionInput = ({ onDecode, onZero }: { onDecode: (decoded: any) => vo
       ],
       name: "joinTournament",
       outputs: [],
-      stateMutability: "nonpayable",
+      stateMutability: "payable",
       type: "function",
     },
   ];
