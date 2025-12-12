@@ -5,7 +5,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
 import { RainbowKitProvider } from "@rainbow-me/rainbowkit";
-import { WagmiProvider } from "wagmi";
+import { WagmiProvider, type Config } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { mainnet } from "wagmi/chains";
 import { useEffect, useState } from "react";
@@ -27,7 +27,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [config, setConfig] = useState<any>(null);
+  const [config, setConfig] = useState<Config | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {

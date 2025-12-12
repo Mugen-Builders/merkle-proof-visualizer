@@ -85,7 +85,7 @@ const SignerControl: React.FC<SignerControlProps> = ({ nodes, onSign }) => {
       console.log("Tournament isFinished:", isFinished);
       console.log("Tournament isClosed:", isClosed);
       console.log("Tournament bondValue:", bondValue.toString(), "wei");
-
+      
       if (isFinished) {
         alert("❌ Tournament is FINISHED. You cannot join a finished tournament.");
         setIsChecking(false);

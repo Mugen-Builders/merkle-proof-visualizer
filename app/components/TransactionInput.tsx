@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { createPublicClient, http, decodeFunctionData } from "viem";
 import { mainnet, sepolia } from "viem/chains";
+import { DecodedData } from "../types";
 
-const TransactionInput = ({ onDecode, onZero }: { onDecode: (decoded: any) => void; onZero: () => void; }) => {
+const TransactionInput = ({ onDecode, onZero }: { onDecode: (decoded: DecodedData) => void; onZero: () => void; }) => {
   const [transactionHash, setTransactionHash] = useState("");
 
   const client = createPublicClient({
@@ -36,10 +37,10 @@ const TransactionInput = ({ onDecode, onZero }: { onDecode: (decoded: any) => vo
         if (decoded && decoded.args) {
           const [finalState, proof, leftNode, rightNode] = decoded.args; // Map positional arguments
           onDecode({
-            finalState: finalState || null,
-            proof: proof || [],
-            leftNode: leftNode || null,
-            rightNode: rightNode || null,
+            finalState: typeof finalState === 'string' ? finalState : "",
+            proof: Array.isArray(proof) ? proof.map(p => typeof p === 'string' ? p : "") : [],
+            leftNode: typeof leftNode === 'string' ? leftNode : null,
+            rightNode: typeof rightNode === 'string' ? rightNode : null,
           });
         } else {
           console.error("Decoded data or arguments are undefined.");

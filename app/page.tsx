@@ -8,6 +8,7 @@ import TreeHeightControl from "./components/TreeHeightControl";
 import ZoomControl from "./components/ZoomControl";
 import Diagram from "./components/Diagram";
 import SignerControl from "./components/SignerControl";
+import { DecodedData } from "./types";
 
 /**
  * Merkle Proof Diagram – interactive React page
@@ -111,7 +112,7 @@ export default function MerkleProofPage() {
   const [height, setHeight] = useState(6); // number of proof elements
   const [pattern, setPattern] = useState(Array.from({ length: 6 }, () => true));
   const [zoom, setZoom] = useState(1); // Zoom level
-  const [decodedData, setDecodedData] = useState<any>(null); // Decoded transaction data
+  const [decodedData, setDecodedData] = useState<DecodedData | null>(null); // Decoded transaction data
   const [nodes, setNodes] = useState<{ id: string; label: string; x: number; y: number }[]>([]); // Add state for nodes
 
   // keep pattern length in sync with height
@@ -131,13 +132,28 @@ export default function MerkleProofPage() {
   });
 
   useEffect(() => {
-    const newLayout = useLayout({
-      height,
-      pattern: normalizedPattern,
-      proof: decodedData?.proof || [],
-      finalState: decodedData?.finalState || "",
-    });
-    setNodes(newLayout.nodes);
+    // Calculate Merkle tree path values if we have decoded proof data
+    if (decodedData?.proof && decodedData.proof.length > 0 && decodedData.finalState) {
+      const proof = decodedData.proof;
+      let node = Buffer.from(decodedData.finalState.slice(2), "hex");
+      const updatedNodes = [...layoutNodes];
+
+      for (let i = 0; i < proof.length - 1; i++) {
+        const sibling = Buffer.from(proof[i].slice(2), "hex");
+        node = Buffer.from(keccak256(Buffer.concat([sibling, node])).slice(2), "hex");
+
+        const pathNodeId = `path-${proof.length - 1 - i}`;
+        const pathNode = updatedNodes.find((n) => n.id === pathNodeId);
+
+        if (pathNode) {
+          pathNode.label = "0x" + node.toString("hex");
+        }
+      }
+
+      setNodes(updatedNodes);
+    } else {
+      setNodes(layoutNodes);
+    }
   }, [height, normalizedPattern, decodedData]);
 
   return (
@@ -167,14 +183,6 @@ export default function MerkleProofPage() {
               proof: newProof,
               finalState: newFinalState,
             });
-
-            const { nodes: layoutNodes } = useLayout({
-              height: newHeight,
-              pattern: Array.from({ length: newHeight }, () => true),
-              proof: newProof,
-              finalState: newFinalState,
-            });
-            setNodes(layoutNodes);
           }}
           onDecode={(decoded) => {
             setDecodedData(decoded);
@@ -185,33 +193,6 @@ export default function MerkleProofPage() {
               if (Array.isArray(proof) && proof.length > 0) {
                 setPattern(proof.map(() => true)); // Use the proof length to set the pattern
                 setHeight(proof.length); // Set the height based on the proof length
-
-                // Generate the layout using useLayout with all siblings on the left
-                const { nodes: layoutNodes, links, dims } = useLayout({
-                  height: proof.length,
-                  pattern: Array.from({ length: proof.length }, () => true), // Ensure all siblings are on the left
-                  proof,
-                  finalState: decoded.finalState,
-                });
-
-                // Calculate values for right nodes (path-x nodes except the last one)
-                let node = Buffer.from(decoded.finalState.slice(2), "hex");
-                const updatedNodes = [...layoutNodes];
-
-                for (let i = 0; i < proof.length - 1; i++) {
-                  const sibling = Buffer.from(proof[i].slice(2), "hex");
-                  node = Buffer.from(keccak256(Buffer.concat([sibling, node])).slice(2), "hex");
-
-                  // Find the corresponding path-x node and update its label
-                  const pathNodeId = `path-${proof.length - 1 - i}`;
-                  const pathNode = updatedNodes.find((n) => n.id === pathNodeId);
-
-                  if (pathNode) {
-                    pathNode.label = "0x" + node.toString("hex");
-                  }
-                }
-
-                setNodes(updatedNodes); // Update the nodes state with calculated values
               } else {
                 console.error("Proof data is not a valid array or is empty.");
               }
